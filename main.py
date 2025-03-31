@@ -78,9 +78,7 @@ async def rank(ctx, *, summoner_name):
 
     account_data = account_response.json()
     puuid = account_data["puuid"]
-
-    print(f"{account[0]}#{account[1]}\npuuid = {puuid}")
-
+    
     # Get ranked info using League V4
     ranked_url = f"https://{REGION}.api.riotgames.com/lol/league/v4/entries/by-puuid/{puuid}"
     ranked_response = requests.get(ranked_url, headers=headers)
