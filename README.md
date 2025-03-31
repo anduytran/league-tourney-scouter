@@ -1,0 +1,1 @@
+League Tourney Scouter is a Discord bot that allows you to pull information about opposing teams in Discord to keep the conversation focused in Discord rather than doing individual scouting and having to screen shot.
