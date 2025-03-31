@@ -65,22 +65,23 @@ class Team:
 
 @bot.command()
 async def rank(ctx, *, summoner_name):
-    # Get account info from Summoner V4
+    # Get account info from account
     account = summoner_name.split("#")
 
-    summoner_url = f"https://{REGION}.api.riotgames.com/lol/summoner/v4/summoners/by-name/{account[0]}/{account[1]}"
+    summoner_url = f"https://americas.api.riotgames.com/riot/account/v1/accounts/by-riot-id/{account[0]}/{account[1]}"
     headers = {"X-Riot-Token": RIOT_API_KEY}
     summoner_response = requests.get(summoner_url, headers=headers)
-    print(f"{account[0]}")
 
     if summoner_response.status_code != 200:
         await ctx.send("Summoner not found.")
         return
 
     summoner_data = summoner_response.json()
-    summoner_id = summoner_data["id"]
+    #summoner_id = summoner_data["id"]
+    #level = summoner_data["summonerLevel"]
     puuid = summoner_data["puuid"]
-    level = summoner_data["summonerLevel"]
+
+    print(f"{account[0]}#{account[1]}\npuuid = {puuid}")
 
     # Get ranked info using League V4
     ranked_url = f"https://{REGION}.api.riotgames.com/lol/league/v4/entries/by-summoner/{summoner_id}"
