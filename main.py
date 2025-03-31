@@ -64,7 +64,7 @@ class Team:
         return f"Team(team_name={self.team_name}, players={self.players})"
 
 @bot.command()
-async def rank(ctx, *, summoner_name):
+async def player(ctx, *, summoner_name):
     # Get account info from account
     account = summoner_name.split("#")
 
@@ -88,6 +88,12 @@ async def rank(ctx, *, summoner_name):
     summoner_response = requests.get(summoner_url, headers=headers)
     summoner_data = summoner_response.json()
     level = summoner_data["summonerLevel"]
+
+    mastery_url = f"https://na1.api.riotgames.com/lol/champion-mastery/v4/champion-masteries/by-puuid/{puuid}/top?count=3"
+    master_response = requests.get(mastery_url, headers=headers)
+    mastery_data = master_response.json()
+    champion_id = mastery_data["championId"]
+    champion_pts = mastery_data["championPoints"]
 
     if not ranked_data:
         await ctx.send(f"{summoner_name} is unranked.")
