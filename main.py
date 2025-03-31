@@ -68,9 +68,10 @@ async def rank(ctx, *, summoner_name):
     # Get account info from Summoner V4
     account = summoner_name.split("#")
 
-    summoner_url = f"https://{REGION}.api.riotgames.com/lol/summoner/v4/summoners/by-name/{account[0]/account[1]}"
+    summoner_url = f"https://{REGION}.api.riotgames.com/lol/summoner/v4/summoners/by-name/{account[0]}/{account[1]}"
     headers = {"X-Riot-Token": RIOT_API_KEY}
     summoner_response = requests.get(summoner_url, headers=headers)
+    print(f"{account[0]}")
 
     if summoner_response.status_code != 200:
         await ctx.send("Summoner not found.")
