@@ -4,7 +4,19 @@ from discord.ext import commands
 import requests
 from dotenv import load_dotenv, find_dotenv
 import os
+import json
 
+def get_champion_name(champion_id):
+    """
+    Given a champion id (e.g., 266), return the champion name.
+    Note: champion_id can be int or str. The JSON 'key' values are strings.
+    """
+    target = str(champion_id)
+    for champ in champion_data.values():
+        if champ["key"] == target:
+            return champ["name"]
+    return None
+    
 conn = sqlite3.connect("botdata.db")
 cursor = conn.cursor()
 
@@ -32,6 +44,10 @@ intents = discord.Intents.all()
 bot = commands.Bot(command_prefix='l!', intents=intents)
 print(RIOT_API_KEY)
 print(DISCORD_TOKEN)
+
+with open("data/championFull.json", "r") as file:
+    data = json.load(file)
+champion_data = data["data"]
 
 @bot.event
 async def on_ready():
@@ -92,12 +108,8 @@ async def player(ctx, *, summoner_name):
     mastery_url = f"https://na1.api.riotgames.com/lol/champion-mastery/v4/champion-masteries/by-puuid/{puuid}/top?count=3"
     master_response = requests.get(mastery_url, headers=headers)
     mastery_data = master_response.json()
-    champion_id = mastery_data["championId"]
-    champion_pts = mastery_data["championPoints"]
-
-    if not ranked_data:
-        await ctx.send(f"{summoner_name} is unranked.")
-        return
+    champion_ids = [entry["championId"] for entry in mastery_data]
+    champion_pts = [entry["championPoints"] for entry in mastery_data]
 
     rank_messages = []
     for queue in ranked_data:
@@ -112,10 +124,19 @@ async def player(ctx, *, summoner_name):
         rank_messages.append(
             f"**{queue_type}**: {tier} {rank} - {lp} LP ({wins}W/{losses}L, {winrate}% WR)"
         )
-
-    final_message = f"**{summoner_name}** (Level {level}):\n" + "\n".join(rank_messages)
-    await ctx.send(final_message)
-
+    if not ranked_data:
+        await ctx.send(f"{summoner_name} is unranked.")
+        top3 = "\n".join([f"{get_champion_name(champ_id)} with {pts} points" for champ_id, pts in zip(champion_ids, champion_pts)])
+        final_message = "\n\nTop 3 Champion Masteries:\n" + top3
+        await ctx.send(final_message)
+        return
+    else:
+        final_message = f"**{summoner_name}** (Level {level}):\n" + "\n".join(rank_messages)
+        top3 = "\n".join([f"{get_champion_name(champ_id)} with {pts} points" for champ_id, pts in zip(champion_ids, champion_pts)])
+        final_message += "\n\nTop 3 Champion Masteries:\n" + top3
+        await ctx.send(final_message)
+    
+@bot.command()
 async def teamadd(ctx, *, team_name):
     """
     Creates a new team with the provided team_name and 5 placeholder players.
