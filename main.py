@@ -2,6 +2,7 @@ import discord
 import sqlite3
 from discord.ext import commands
 import requests
+from dotenv import load_dotenv, find_dotenv
 import os
 
 conn = sqlite3.connect("botdata.db")
@@ -22,10 +23,15 @@ conn.close()
 # Replace with your tokens
 RIOT_API_KEY = 'YOUR_RIOT_API_KEY'
 DISCORD_TOKEN = 'YOUR_DISCORD_BOT_TOKEN'
+load_dotenv(find_dotenv(), override=True)
+RIOT_API_KEY = os.getenv('RIOT_API_KEY')
+DISCORD_TOKEN = os.getenv('DISCORD_TOKEN')
 REGION = 'na1'  # or 'euw1', 'kr', etc.
 
-intents = discord.Intents.default()
+intents = discord.Intents.all()
 bot = commands.Bot(command_prefix='l!', intents=intents)
+print(RIOT_API_KEY)
+print(DISCORD_TOKEN)
 
 @bot.event
 async def on_ready():
@@ -60,7 +66,9 @@ class Team:
 @bot.command()
 async def rank(ctx, *, summoner_name):
     # Get account info from Summoner V4
-    summoner_url = f"https://{REGION}.api.riotgames.com/lol/summoner/v4/summoners/by-name/{summoner_name}"
+    account = summoner_name.split("#")
+
+    summoner_url = f"https://{REGION}.api.riotgames.com/lol/summoner/v4/summoners/by-name/{account[0]/account[1]}"
     headers = {"X-Riot-Token": RIOT_API_KEY}
     summoner_response = requests.get(summoner_url, headers=headers)
 
