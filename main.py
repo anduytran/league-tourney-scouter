@@ -25,6 +25,13 @@ def get_account(summoner_name):
         return 404
     return account_response.json()
 
+def get_account_by_puuid(puuid):
+    account_url = f"https://americas.api.riotgames.com/riot/account/v1/accounts/by-puuid/{puuid}"
+    account_response = requests.get(account_url, headers=headers)
+    if account_response.status_code != 200:
+        return 404
+    return account_response.json()
+
 def get_rank(puuid):
     ranked_url = f"https://{REGION}.api.riotgames.com/lol/league/v4/entries/by-puuid/{puuid}"
     ranked_response = requests.get(ranked_url, headers=headers)
@@ -203,6 +210,11 @@ async def team(ctx, subcommand: str, team_name: str, *players: str):
         cursor.execute(f"INSERT INTO teams (team_name, puuid1, puuid2, puuid3, puuid4, puuid5) VALUES (?, ?, ?, ?, ?, ?)", (team_name, puuids[0], puuids[1], puuids[2], puuids[3], puuids[4]))
         await ctx.send(f"Team {team_name} successfully added!")
         conn.close()
+    if subcommand.lower() == "info":
+        cursor.execute("SELECT * FROM teams WHERE team_name = ?", (team_name,))
+        final_message = f"**{cursor.fetchone()}**:\n"
+        puuids = [cursor.fetchone(), cursor.fetchone(), cursor.fetchone(), cursor.fetchone(), cursor.fetchone()]
+        final_message += get_summoner(puuids[0])
 
     elif subcommand.lower() == "remove":
         # Remove the team if it exists.
