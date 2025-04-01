@@ -14,7 +14,7 @@ def get_champion_name(champion_id):
     target = str(champion_id)
     for champ in champion_data.values():
         if champ["key"] == target:
-            return champ["name"]
+            return [champ["name"]]
     return None
     
 conn = sqlite3.connect("botdata.db")
@@ -94,6 +94,8 @@ async def player(ctx, *, summoner_name):
 
     account_data = account_response.json()
     puuid = account_data["puuid"]
+    name = account_data["gameName"]
+    tag = account_data["tagLine"]
     
     # Get ranked info using League V4
     ranked_url = f"https://{REGION}.api.riotgames.com/lol/league/v4/entries/by-puuid/{puuid}"
@@ -125,14 +127,14 @@ async def player(ctx, *, summoner_name):
             f"**{queue_type}**: {tier} {rank} - {lp} LP ({wins}W/{losses}L, {winrate}% WR)"
         )
     if not ranked_data:
-        await ctx.send(f"{summoner_name} is unranked.")
-        top3 = "\n".join([f"{get_champion_name(champ_id)} with {pts} points" for champ_id, pts in zip(champion_ids, champion_pts)])
+        await ctx.send(f"{name}#{tag} is unranked.")
+        top3 = "\n".join([f"**{get_champion_name(champ_id)}** with {pts} points" for champ_id, pts in zip(champion_ids, champion_pts)])
         final_message = "\n\nTop 3 Champion Masteries:\n" + top3
         await ctx.send(final_message)
         return
     else:
-        final_message = f"**{summoner_name}** (Level {level}):\n" + "\n".join(rank_messages)
-        top3 = "\n".join([f"{get_champion_name(champ_id)} with {pts} points" for champ_id, pts in zip(champion_ids, champion_pts)])
+        final_message = f"**{name}#{tag}** (Level {level}):\n" + "\n".join(rank_messages)
+        top3 = "\n".join([f"**{get_champion_name(champ_id)}** with {pts} points" for champ_id, pts in zip(champion_ids, champion_pts)])
         final_message += "\n\nTop 3 Champion Masteries:\n" + top3
         await ctx.send(final_message)
     
