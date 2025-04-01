@@ -16,16 +16,65 @@ def get_champion_name(champion_id):
         if champ["key"] == target:
             return [champ["name"]]
     return None
-    
+
+def get_account(summoner_name):
+    account = summoner_name.split("#")
+    account_url = f"https://americas.api.riotgames.com/riot/account/v1/accounts/by-riot-id/{account[0]}/{account[1]}"
+    account_response = requests.get(account_url, headers=headers)
+
+    if account_response.status_code != 200:
+        return 404
+
+    return account_response.json()
+
+def get_rank(puuid):
+    ranked_url = f"https://{REGION}.api.riotgames.com/lol/league/v4/entries/by-puuid/{puuid}"
+    ranked_response = requests.get(ranked_url, headers=headers)
+    return ranked_response.json()
+
+def get_summoner(puuid):
+    summoner_url = f"https://na1.api.riotgames.com/lol/summoner/v4/summoners/by-puuid/{puuid}"
+    summoner_response = requests.get(summoner_url, headers=headers)
+    return summoner_response.json()
+
+def get_mastery(puuid):
+    mastery_url = f"https://na1.api.riotgames.com/lol/champion-mastery/v4/champion-masteries/by-puuid/{puuid}/top?count=3"
+    master_response = requests.get(mastery_url, headers=headers)
+    mastery_data = master_response.json()
+
 conn = sqlite3.connect("botdata.db")
 cursor = conn.cursor()
 
 cursor.execute('''
 CREATE TABLE IF NOT EXISTS user_searches (
     puuid TEXT,
-    summoner_name TEXT,
+    name TEXT,
+    tag TEXT,
     search_count INTEGER,
-    PRIMARY KEY (puuid, summoner_name)
+    PRIMARY KEY (puuid)
+)
+''')
+
+cursor.execute('''
+CREATE TABLE IF NOT EXISTS teams (
+    team_name TEXT PRIMARY KEY
+    puuid1 TEXT,
+    puuid2 TEXT,
+    puuid3 TEXT,
+    puuid4 TEXT,
+    puuid5 TEXT,
+)
+''')
+
+cursor.execute('''
+CREATE TABLE IF NOT EXISTS players (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    team_name TEXT,
+    player_order INTEGER,
+    player_name TEXT,
+    rank INTEGER,
+    mastery_champions TEXT,
+    FOREIGN KEY(team_name) REFERENCES teams(team_name) ON DELETE CASCADE
 )
 ''')
 
@@ -38,6 +87,7 @@ DISCORD_TOKEN = 'YOUR_DISCORD_BOT_TOKEN'
 load_dotenv(find_dotenv(), override=True)
 RIOT_API_KEY = os.getenv('RIOT_API_KEY')
 DISCORD_TOKEN = os.getenv('DISCORD_TOKEN')
+headers = {"X-Riot-Token": RIOT_API_KEY}
 REGION = 'na1'  # or 'euw1', 'kr', etc.
 
 intents = discord.Intents.all()
@@ -53,7 +103,7 @@ champion_data = data["data"]
 async def on_ready():
     print(f'Logged in as {bot.user}')
 
-    # Define a Player class to hold player information
+# Define a Player class to hold player information
 class Player:
     def __init__(self, name, rank, mastery_champions):
         self.name = name
@@ -81,35 +131,23 @@ class Team:
 
 @bot.command()
 async def player(ctx, *, summoner_name):
-    # Get account info from account
-    account = summoner_name.split("#")
-
-    account_url = f"https://americas.api.riotgames.com/riot/account/v1/accounts/by-riot-id/{account[0]}/{account[1]}"
-    headers = {"X-Riot-Token": RIOT_API_KEY}
-    account_response = requests.get(account_url, headers=headers)
-
-    if account_response.status_code != 200:
+    # Get account info from Account API
+    account_data = get_account(summoner_name)
+    if account_data == 404:
         await ctx.send("Summoner not found.")
         return
-
-    account_data = account_response.json()
     puuid = account_data["puuid"]
     name = account_data["gameName"]
     tag = account_data["tagLine"]
     
-    # Get ranked info using League V4
-    ranked_url = f"https://{REGION}.api.riotgames.com/lol/league/v4/entries/by-puuid/{puuid}"
-    ranked_response = requests.get(ranked_url, headers=headers)
-    ranked_data = ranked_response.json()
+    # Get ranked info using League V4 API
+    ranked_data = get_rank(puuid)
 
-    summoner_url = f"https://na1.api.riotgames.com/lol/summoner/v4/summoners/by-puuid/{puuid}"
-    summoner_response = requests.get(summoner_url, headers=headers)
-    summoner_data = summoner_response.json()
+    # Get summoner info using Summoner API
+    summoner_data = get_summoner
     level = summoner_data["summonerLevel"]
 
-    mastery_url = f"https://na1.api.riotgames.com/lol/champion-mastery/v4/champion-masteries/by-puuid/{puuid}/top?count=3"
-    master_response = requests.get(mastery_url, headers=headers)
-    mastery_data = master_response.json()
+    mastery_data = get_mastery(puuid)
     champion_ids = [entry["championId"] for entry in mastery_data]
     champion_pts = [entry["championPoints"] for entry in mastery_data]
 
@@ -139,27 +177,40 @@ async def player(ctx, *, summoner_name):
         await ctx.send(final_message)
     
 @bot.command()
-async def teamadd(ctx, *, team_name):
+async def team(ctx, subcommand: str, team_name: str, *players: str):
     """
     Creates a new team with the provided team_name and 5 placeholder players.
     Each player currently has default placeholder data (name, rank, and mastery champions).
     """
-    players = []
-    # Create 5 player objects with placeholder values
-    for i in range(5):
-        player_name = f"Player{i+1}"
-        rank_value = 0  # Replace with actual rank value when available
-        mastery_champions = ["Champion1", "Champion2", "Champion3"]
-        players.append(Player(name=player_name, rank=rank_value, mastery_champions=mastery_champions))
-    
-    # Create the team object
-    team = Team(team_name=team_name, players=players)
-    # Store the team in our in-memory dictionary (or later in your persistent database)
-    teams_storage[team_name] = team
+    conn = sqlite3.connect("botdata.db")
+    cursor = conn.cursor()
 
-    # Calculate the average rank from the player objects
-    avg_rank = team.average_rank()
-    await ctx.send(f"Team '{team_name}' created with 5 players. Average rank: {avg_rank}")
+    if subcommand.lower() == "add":
+        cursor.execute("SELECT team_name FROM teams WHERE team_name = ?", (team_name,))
+        if cursor.fetchone() is not None:
+            await ctx.send(f"Team '{team_name}' already exists.")
+            conn.close()
+            return
+        # Check that exactly 5 player names were provided.
+        if len(player_names) != 5:
+            await ctx.send("Please provide exactly 5 player names for team creation.\nFormat: `!team add teamname player1 player2 player3 player4 player5`")
+            conn.close()
+            return
+        
+        cursor.execute("INSERT INTO teams (team_name) VALUES (?)", (team_name,))
+
+
+
+    elif subcommand.lower() == "remove":
+        # Remove the team if it exists.
+        if team_name in teams_storage:
+            del teams_storage[team_name]
+            await ctx.send(f"Team '{team_name}' has been removed.")
+        else:
+            await ctx.send(f"Team '{team_name}' does not exist.")
+
+    else:
+        await ctx.send("Invalid subcommand. Please use 'add' or 'remove'.")
 
 
 
