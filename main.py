@@ -21,10 +21,8 @@ def get_account(summoner_name):
     account = summoner_name.split("#")
     account_url = f"https://americas.api.riotgames.com/riot/account/v1/accounts/by-riot-id/{account[0]}/{account[1]}"
     account_response = requests.get(account_url, headers=headers)
-
     if account_response.status_code != 200:
         return 404
-
     return account_response.json()
 
 def get_rank(puuid):
@@ -40,28 +38,27 @@ def get_summoner(puuid):
 def get_mastery(puuid):
     mastery_url = f"https://na1.api.riotgames.com/lol/champion-mastery/v4/champion-masteries/by-puuid/{puuid}/top?count=3"
     master_response = requests.get(mastery_url, headers=headers)
-    mastery_data = master_response.json()
+    return master_response.json()
 
 conn = sqlite3.connect("botdata.db")
 cursor = conn.cursor()
 
 cursor.execute('''
 CREATE TABLE IF NOT EXISTS players (
-    puuid TEXT,
+    puuid TEXT PRIMARY KEY,
     name TEXT,
-    tag TEXT,
-    PRIMARY KEY (puuid)
+    tag TEXT
 )
 ''')
 
 cursor.execute('''
 CREATE TABLE IF NOT EXISTS teams (
-    team_name TEXT PRIMARY KEY
+    team_name TEXT PRIMARY KEY,
     puuid1 TEXT,
     puuid2 TEXT,
     puuid3 TEXT,
     puuid4 TEXT,
-    puuid5 TEXT,
+    puuid5 TEXT
 )
 ''')
 
@@ -131,7 +128,7 @@ async def player(ctx, *, summoner_name):
     ranked_data = get_rank(puuid)
 
     # Get summoner info using Summoner API
-    summoner_data = get_summoner
+    summoner_data = get_summoner(puuid)
     level = summoner_data["summonerLevel"]
 
     mastery_data = get_mastery(puuid)
@@ -179,25 +176,28 @@ async def team(ctx, subcommand: str, team_name: str, *players: str):
             conn.close()
             return
         # Check that exactly 5 player names were provided.
-        if len(player_names) != 5:
+        if len(players) != 5:
             await ctx.send("Please provide exactly 5 player names for team creation.\nFormat: `!team add teamname player1 player2 player3 player4 player5`")
             conn.close()
             return
         
         #cursor.execute(f"INSERT INTO teams {team_name} VALUES (?)", (team_name,))
         for i in range(5):
-            cursor.execute(f"SELECT puuid FROM players WHERE name = {players[i].split('#')[0]} and tag = {players[i].split('#')[1]}")
+            name_value = players[i].split('#')[0]
+            tag_value = players[i].split('#')[1]
+            cursor.execute("SELECT puuid FROM players WHERE name = ? and tag = ?", (name_value, tag_value))
             if cursor.fetchone() is None:
-                account_data = get_champion_name(players[i])
+                account_data = get_account(players[i])
+                print(account_data)
                 puuid = account_data["puuid"]
                 name = account_data["gameName"]
                 tag = account_data["tagLine"]
-                cursor.execute(f"INSERT INTO players (puuid, name, tag) VALUES ({puuid}, {name}, {tag}")
-                conn.commit()
+                player_query = f"INSERT INTO players (puuid, name, tag) VALUES (?, ?, ?)"
+                player_data = (puuid, name, tag)
+                cursor.execute(player_query, player_data)
                 
-
-
-
+                conn.commit()
+        conn.close()
 
     elif subcommand.lower() == "remove":
         # Remove the team if it exists.
