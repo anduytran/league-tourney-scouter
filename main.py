@@ -46,11 +46,10 @@ conn = sqlite3.connect("botdata.db")
 cursor = conn.cursor()
 
 cursor.execute('''
-CREATE TABLE IF NOT EXISTS user_searches (
+CREATE TABLE IF NOT EXISTS players (
     puuid TEXT,
     name TEXT,
     tag TEXT,
-    search_count INTEGER,
     PRIMARY KEY (puuid)
 )
 ''')
@@ -63,18 +62,6 @@ CREATE TABLE IF NOT EXISTS teams (
     puuid3 TEXT,
     puuid4 TEXT,
     puuid5 TEXT,
-)
-''')
-
-cursor.execute('''
-CREATE TABLE IF NOT EXISTS players (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    team_name TEXT,
-    player_order INTEGER,
-    player_name TEXT,
-    rank INTEGER,
-    mastery_champions TEXT,
-    FOREIGN KEY(team_name) REFERENCES teams(team_name) ON DELETE CASCADE
 )
 ''')
 
@@ -197,7 +184,18 @@ async def team(ctx, subcommand: str, team_name: str, *players: str):
             conn.close()
             return
         
-        cursor.execute("INSERT INTO teams (team_name) VALUES (?)", (team_name,))
+        #cursor.execute(f"INSERT INTO teams {team_name} VALUES (?)", (team_name,))
+        for i in range(5):
+            cursor.execute(f"SELECT puuid FROM players WHERE name = {players[i].split('#')[0]} and tag = {players[i].split('#')[1]}")
+            if cursor.fetchone() is None:
+                account_data = get_champion_name(players[i])
+                puuid = account_data["puuid"]
+                name = account_data["gameName"]
+                tag = account_data["tagLine"]
+                cursor.execute(f"INSERT INTO players (puuid, name, tag) VALUES ({puuid}, {name}, {tag}")
+                conn.commit()
+                
+
 
 
 
