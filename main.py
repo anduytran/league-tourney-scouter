@@ -200,8 +200,8 @@ async def team(ctx, subcommand: str, team_name: str, *players: str):
                 conn.commit()
             else:
                 puuids[i] = cursor.fetchone()
-            cursor.execute(f"INSERT INTO teams (team_name, puuid1, puuid2, puuid3, puuid4, puuid5) VALUES (?, ?, ?, ?, ?, ?)", (team_name, puuids[0], puuids[1], puuids[2], puuids[3], puuids[4]))
-            await ctx.send(f"Team {team_name} successfully added!")
+        cursor.execute(f"INSERT INTO teams (team_name, puuid1, puuid2, puuid3, puuid4, puuid5) VALUES (?, ?, ?, ?, ?, ?)", (team_name, puuids[0], puuids[1], puuids[2], puuids[3], puuids[4]))
+        await ctx.send(f"Team {team_name} successfully added!")
         conn.close()
 
     elif subcommand.lower() == "remove":
