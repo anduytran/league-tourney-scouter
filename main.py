@@ -150,13 +150,13 @@ async def player(ctx, *, summoner_name):
         )
     if not ranked_data:
         await ctx.send(f"{name}#{tag} is unranked.")
-        top3 = "\n".join([f"**{get_champion_name(champ_id)}** with {pts} points" for champ_id, pts in zip(champion_ids, champion_pts)])
+        top3 = "\n".join([f"**{get_champion_name(champ_id)[2:-2]}** with {pts} points" for champ_id, pts in zip(champion_ids, champion_pts)])
         final_message = "\n\nTop 3 Champion Masteries:\n" + top3
         await ctx.send(final_message)
         return
     else:
         final_message = f"**{name}#{tag}** (Level {level}):\n" + "\n".join(rank_messages)
-        top3 = "\n".join([f"**{get_champion_name(champ_id)}** with {pts} points" for champ_id, pts in zip(champion_ids, champion_pts)])
+        top3 = "\n".join([f"**{get_champion_name(champ_id)[2:-2]}** with {pts} points" for champ_id, pts in zip(champion_ids, champion_pts)])
         final_message += "\n\nTop 3 Champion Masteries:\n" + top3
         await ctx.send(final_message)
     
@@ -181,7 +181,8 @@ async def team(ctx, subcommand: str, team_name: str, *players: str):
             conn.close()
             return
         
-        #cursor.execute(f"INSERT INTO teams {team_name} VALUES (?)", (team_name,))
+        
+        puuids = [None, None, None, None, None]
         for i in range(5):
             name_value = players[i].split('#')[0]
             tag_value = players[i].split('#')[1]
@@ -197,6 +198,10 @@ async def team(ctx, subcommand: str, team_name: str, *players: str):
                 cursor.execute(player_query, player_data)
                 
                 conn.commit()
+            else:
+                puuids[i] = cursor.fetchone()
+            cursor.execute(f"INSERT INTO teams (team_name, puuid1, puuid2, puuid3, puuid4, puuid5) VALUES (?, ?, ?, ?, ?, ?)", (team_name, puuids[0], puuids[1], puuids[2], puuids[3], puuids[4]))
+            await ctx.send(f"Team {team_name} successfully added!")
         conn.close()
 
     elif subcommand.lower() == "remove":
