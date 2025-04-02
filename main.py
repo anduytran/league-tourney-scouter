@@ -42,8 +42,8 @@ def get_summoner(puuid):
     summoner_response = requests.get(summoner_url, headers=headers)
     return summoner_response.json()
 
-def get_mastery(puuid):
-    mastery_url = f"https://na1.api.riotgames.com/lol/champion-mastery/v4/champion-masteries/by-puuid/{puuid}/top?count=3"
+def get_mastery(puuid, count):
+    mastery_url = f"https://na1.api.riotgames.com/lol/champion-mastery/v4/champion-masteries/by-puuid/{puuid}/top?count={count}"
     master_response = requests.get(mastery_url, headers=headers)
     return master_response.json()
 
@@ -80,6 +80,7 @@ RIOT_API_KEY = os.getenv('RIOT_API_KEY')
 DISCORD_TOKEN = os.getenv('DISCORD_TOKEN')
 headers = {"X-Riot-Token": RIOT_API_KEY}
 REGION = 'na1'  # or 'euw1', 'kr', etc.
+puuids = [None, None, None, None, None]
 
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix='l!', intents=intents)
@@ -138,7 +139,7 @@ async def player(ctx, *, summoner_name):
     summoner_data = get_summoner(puuid)
     level = summoner_data["summonerLevel"]
 
-    mastery_data = get_mastery(puuid)
+    mastery_data = get_mastery(puuid, 3)
     champion_ids = [entry["championId"] for entry in mastery_data]
     champion_pts = [entry["championPoints"] for entry in mastery_data]
 
@@ -193,7 +194,7 @@ async def team(ctx, subcommand: str, team_name: str, *players: str):
         for i in range(5):
             name_value = players[i].split('#')[0]
             tag_value = players[i].split('#')[1]
-            cursor.execute("SELECT puuid FROM players WHERE name = ? and tag = ?", (name_value, tag_value))
+            cursor.execute("SELECT puuid FROM players WHERE REPLACE(LOWER(name), ' ', '') = ? AND LOWER(tag) = ?", (name_value.lower().replace(" ", ""), tag_value.lower()))
             if cursor.fetchone() is None:
                 account_data = get_account(players[i])
                 print(account_data)
@@ -209,13 +210,47 @@ async def team(ctx, subcommand: str, team_name: str, *players: str):
                 puuids[i] = cursor.fetchone()
         cursor.execute(f"INSERT INTO teams (team_name, puuid1, puuid2, puuid3, puuid4, puuid5) VALUES (?, ?, ?, ?, ?, ?)", (team_name, puuids[0], puuids[1], puuids[2], puuids[3], puuids[4]))
         await ctx.send(f"Team {team_name} successfully added!")
+        puuids = [None, None, None, None, None]
+        conn.commit()
         conn.close()
+        return
     if subcommand.lower() == "info":
         cursor.execute("SELECT * FROM teams WHERE team_name = ?", (team_name,))
-        final_message = f"**{cursor.fetchone()}**:\n"
-        puuids = [cursor.fetchone(), cursor.fetchone(), cursor.fetchone(), cursor.fetchone(), cursor.fetchone()]
-        final_message += get_summoner(puuids[0])
+        row = cursor.fetchone()
+        if row is None:
+            await ctx.send("Team not found.")
+            return
+        # row[0] is the team name, row[1]..row[5] are the puuid values.
+        puuids = row[1:]
+        final_message = f"**{row[0]}**:"
+        for i in range(5):
+            cursor.execute("SELECT name, tag FROM players WHERE puuid = ?", (f"{puuids[i]}"))
+            name = cursor.fetchone()
+            tag = cursor.fetchone()
+            summoner_data = get_summoner(puuids[i])
+            level = summoner_data["summonerLevel"]
+            mastery_data = get_mastery(puuids[i], 1)
+            champion_ids = [entry["championId"] for entry in mastery_data]
+            # champion_pts = [entry["championPoints"] for entry in mastery_data]
+            ranked_data = get_rank(puuids[i])
+            rank_messages = []
+            for queue in ranked_data:
+                queue_type = queue["queueType"].replace("_", " ").title()
+                tier = queue["tier"].title()
+                rank = queue["rank"]
+                lp = queue["leaguePoints"]
+                wins = queue["wins"]
+                losses = queue["losses"]
+                winrate = round((wins / (wins + losses)) * 100, 2)
 
+                rank_messages.append(
+                    f"**{queue_type}**: {tier} {rank} - {lp} LP ({wins}W/{losses}L, {winrate}% WR)"
+                )
+            if not ranked_data:
+                final_message += f"\n{i} **{name}#{tag} (Level {level}**): Rank: Unranked - Best Champ: **{get_champion_name(champion_ids)[2:-2]}**"
+            else:
+                final_message += f"\n{i}. **{name}#{tag} (Level {level}**): Rank: {rank_messages} - Best Champ: **{get_champion_name(champion_ids)[2:-2]}**"
+        await ctx.send(final_message)
     elif subcommand.lower() == "remove":
         # Remove the team if it exists.
         if team_name in teams_storage:
