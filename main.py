@@ -204,15 +204,16 @@ async def team(ctx, subcommand: str, team_name: str, *players: str):
                 player_query = f"INSERT INTO players (puuid, name, tag) VALUES (?, ?, ?)"
                 player_data = (puuid, name, tag)
                 cursor.execute(player_query, player_data)
+                puuids[i] = puuid
                 
                 conn.commit()
             else:
                 puuids[i] = cursor.fetchone()
         cursor.execute(f"INSERT INTO teams (team_name, puuid1, puuid2, puuid3, puuid4, puuid5) VALUES (?, ?, ?, ?, ?, ?)", (team_name, puuids[0], puuids[1], puuids[2], puuids[3], puuids[4]))
         await ctx.send(f"Team {team_name} successfully added!")
-        puuids = [None, None, None, None, None]
         conn.commit()
         conn.close()
+        puuids = [None, None, None, None, None]
         return
     if subcommand.lower() == "info":
         cursor.execute("SELECT * FROM teams WHERE team_name = ?", (team_name,))
